@@ -1,15 +1,27 @@
 #!/bin/bash
 
-# Path to your task repository
-TASK_REPO_PATH="$HOME/.task"  # Change this to your task repository path
+# This script wraps around the 'task' command to integrate with Git
+# It should be placed in your PATH and named something like 'gtask' 
+# to avoid conflicts with the original task command
 
-# Change to the task repository directory
-cd "$TASK_REPO_PATH" || { echo "Error: Task repository not found"; exit 1; }
+# Path to your task data directory (where the .git repository is)
+TASK_DATA_DIR="$HOME/.task"
+
+# Make sure the task data directory exists and is a git repository
+if [ ! -d "$TASK_DATA_DIR/.git" ]; then
+  echo "Error: $TASK_DATA_DIR is not a git repository."
+  echo "Please run: cd $TASK_DATA_DIR && git init && git add . && git commit -m 'Initial commit'"
+  exit 1
+fi
+
+# Change to the task data directory
+cd "$TASK_DATA_DIR" || { echo "Error: Could not change to $TASK_DATA_DIR"; exit 1; }
 
 # Function to pull from GitHub
 pull_from_github() {
   echo "Pulling latest changes from GitHub..."
-  git pull origin main || { echo "Error: Failed to pull from GitHub"; exit 1; }
+  git pull origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || 
+    echo "Warning: Could not pull from remote. Is the repository set up with a remote?"
 }
 
 # Function to commit and push changes
@@ -20,10 +32,11 @@ commit_and_push() {
   
   echo "Committing changes..."
   git add .
-  git commit -m "$action: $args" || { echo "Warning: Nothing to commit"; return 0; }
+  git commit -m "task $action: $args" || echo "Warning: Nothing to commit"
   
   echo "Pushing changes to GitHub..."
-  git push origin main || { echo "Error: Failed to push to GitHub"; exit 1; }
+  git push origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || 
+    echo "Warning: Could not push to remote. Is the repository set up with a remote?"
 }
 
 # Main script logic
@@ -33,8 +46,7 @@ case "$1" in
     shift
     
     # Run the original task command with all arguments
-    echo "Running: task $action $*"
-    task "$action" "$@"
+    /usr/bin/task "$action" "$@"
     
     # Commit and push changes
     commit_and_push "$action" "$*"
@@ -42,10 +54,10 @@ case "$1" in
   "")
     # Just "task" with no arguments - pull first then run task
     pull_from_github
-    task
+    /usr/bin/task
     ;;
   *)
     # Any other task command - just run it normally
-    task "$@"
+    /usr/bin/task "$@"
     ;;
 esac
