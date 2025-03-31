@@ -19,9 +19,14 @@ cd "$TASK_DATA_DIR" || { echo "Error: Could not change to $TASK_DATA_DIR"; exit 
 
 # Function to pull from GitHub
 pull_from_github() {
+  # Use GIT_SSH_COMMAND to disable strict host key checking and avoid passphrase prompts
   echo "Pulling latest changes from GitHub..."
-  git pull origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || 
+  GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=no" git pull origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || {
+    # If BatchMode fails (likely due to passphrase), use credential helper
+    git config credential.helper 'cache --timeout=86400'
+    git pull origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || 
     echo "Warning: Could not pull from remote. Is the repository set up with a remote?"
+  }
 }
 
 # Function to commit and push changes
@@ -35,8 +40,13 @@ commit_and_push() {
   git commit -m "task $action: $args" || echo "Warning: Nothing to commit"
   
   echo "Pushing changes to GitHub..."
-  git push origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || 
+  # Use GIT_SSH_COMMAND to disable strict host key checking and avoid passphrase prompts
+  GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=no" git push origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || {
+    # If BatchMode fails (likely due to passphrase), use credential helper
+    git config credential.helper 'cache --timeout=86400'
+    git push origin "$(git rev-parse --abbrev-ref HEAD)" 2>/dev/null || 
     echo "Warning: Could not push to remote. Is the repository set up with a remote?"
+  }
 }
 
 # Main script logic
